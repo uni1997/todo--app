@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>할 일 목록</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1f2328;
+    --muted: #8a919a;
+    --border: #e3e6ea;
+    --accent: #3b6ef5;
+    --accent-text: #ffffff;
+    --danger: #d64545;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171a;
+      --card: #1f2226;
+      --text: #e8eaed;
+      --muted: #8b929b;
+      --border: #33373d;
+      --accent: #5b87ff;
+      --accent-text: #ffffff;
+      --danger: #ff6b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px;
+  }
+  .app {
+    width: 100%;
+    max-width: 480px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    align-self: flex-start;
+  }
+  h1 { margin: 0 0 16px; font-size: 24px; }
+  form { display: flex; gap: 8px; }
+  input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button.add {
+    padding: 10px 16px;
+    font-size: 16px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-text);
+    cursor: pointer;
+  }
+  ul { list-style: none; margin: 20px 0 0; padding: 0; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  li:last-child { border-bottom: 0; }
+  li input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  li .text { flex: 1; word-break: break-word; }
+  li.done .text { text-decoration: line-through; color: var(--muted); }
+  li button.delete {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  li button.delete:hover { color: var(--danger); }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0 8px; }
+  .footer { margin-top: 12px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+  <main class="app">
+    <h1>할 일 목록</h1>
+    <form id="form">
+      <input id="input" type="text" placeholder="할 일을 입력하세요" autocomplete="off" aria-label="새 할 일">
+      <button class="add" type="submit">추가</button>
+    </form>
+    <ul id="list"></ul>
+    <p id="empty" class="empty">할 일이 없습니다. 새로 추가해 보세요!</p>
+    <p id="footer" class="footer"></p>
+  </main>
+
+<script>
+  const STORAGE_KEY = 'todos';
+  const form = document.getElementById('form');
+  const input = document.getElementById('input');
+  const list = document.getElementById('list');
+  const empty = document.getElementById('empty');
+  const footer = document.getElementById('footer');
+
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+    } catch (e) { /* 저장소를 쓸 수 없어도 앱은 계속 동작 */ }
+  }
+
+  let todos = load();
+
+  function render() {
+    list.replaceChildren();
+    for (const todo of todos) {
+      const li = document.createElement('li');
+      if (todo.done) li.classList.add('done');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = todo.done;
+      checkbox.setAttribute('aria-label', '완료');
+      checkbox.addEventListener('change', () => {
+        todo.done = checkbox.checked;
+        save();
+        render();
+      });
+
+      const text = document.createElement('span');
+      text.className = 'text';
+      text.textContent = todo.text;
+
+      const del = document.createElement('button');
+      del.className = 'delete';
+      del.type = 'button';
+      del.textContent = '✕';
+      del.setAttribute('aria-label', '삭제');
+      del.addEventListener('click', () => {
+        todos = todos.filter(t => t.id !== todo.id);
+        save();
+        render();
+      });
+
+      li.append(checkbox, text, del);
+      list.append(li);
+    }
+    empty.hidden = todos.length > 0;
+    const remaining = todos.filter(t => !t.done).length;
+    footer.textContent = todos.length ? `남은 할 일 ${remaining}개 / 전체 ${todos.length}개` : '';
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    todos.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2), text, done: false });
+    save();
+    render();
+    input.value = '';
+    input.focus();
+  });
+
+  render();
+</script>
+</body>
+</html>
